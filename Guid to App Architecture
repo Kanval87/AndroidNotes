@@ -1,0 +1,68 @@
+Notes Only
+
+    1. Desktop Application :
+        1. Have Single entry point
+        2. Run as single monolithic process 
+    2. Android App:
+        1. Constructed out of multiple app components 
+            1. App Components : 
+                1. Ui : Activities - Fragments , views
+                2. Background Process :  Services
+                3. Subscription for information : Broadcast receivers
+                4. Resource/Content sharing : Content Provider
+        2. Complex structure 
+        3. Most of these components are defined in Manifest 
+        4. An android applications NEEDS TO BE more flexible as user might switch between apps quick
+        5. App hopping is common between users
+        6. App can be destroyed anytime when system needs resources
+        7. Data should be stored efficiently and persistently which should not be depended on another component
+        8. Designed unit/module should be cohesive
+    3. Common architectural principal :
+        1. Focus on : separation of concern - high cohesiveness 
+        2. Business logic and Ui logic should be properly separated
+        3. Activity Code and fragment class code should only containst Ui operation and for rest MVP or MVVM or any another architecture should be used - Reason - to avoid lifecycle issue 
+        4. Drive Ui from Models - preferable a persistent model
+            1. User wouldn’t loose data in case of app kill
+            2. App will continue to work in case of required resource is busy (Network , Camera , Sound)
+    4. Recommended App Architecture : 
+        1. UseCase : Imagine we're building a UI that shows a user profile. This user profile will be fetched from our own private backend using a REST API.
+            1. Components would be :
+                1. Ui - Xml , Fragment , Activity
+                2. ViewModel : Base class - The ViewModel class is designed to store and manage UI-related data in a lifecycle conscious way. The ViewModel class allows data to survive configuration changes such as screen rotations - Code :                                                                                                  public class UserProfileViewModel extends ViewModel {
+						    ...
+						    private User user;
+						    private LiveData<User> user;
+						    public LiveData<User> getUser() {
+					        		return user;
+    						}
+					}
+					Now we modify UserProfileFragment to observe the data and update the UI.
+					@Override public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+					    super.onActivityCreated(savedInstanceState);
+					    viewModel.getUser().observe(this, user -> {
+					      // update UI
+					    });
+					}
+                3. WebService Consumer : retrofit 
+                4. Repository model : to make sure data remains persistent  : https://developer.android.com/training/data-storage/room/
+                    1.  Room is an object mapping library that provides local data persistence with minimal boilerplate code. At compile time, it validates each query against the schema, so that broken SQL queries result in compile time errors instead of runtime failures. Room abstracts away some of the underlying implementation details of working with raw SQL tables and queries. It also allows observing changes to the database data (including collections and join queries), exposing such changes via LiveData objects. In addition, it explicitly defines thread constraints that address common issues such as accessing storage on the main thread.
+                5. Architecture require some kind of DI or ServiceLocator (Singleton)
+            2. Implementation : 
+                1. Don’t do it : Naive implementation would be to consume the data through ViewModel and use it for all logic implementation. 
+                2. Make use of repository module instead - Repository modules are responsible for handling data operations. They provide a clean API to the rest of the app. They know where to get the data from and what API calls to make when data is updated. You can consider them as mediators between different data sources (persistent model, web service, cache, etc.).
+    1. ViewModel : is 
+        1. Persistent - throughout the lifecycle 
+        2. Uses : retained fragment under the hood
+
+Benefit of above approach : 
+1. Testability 
+    * User Interface & Interactions: This will be the only time you need an Android UI Instrumentation test. The best way to test UI code is to create an Espresso test. You can create the fragment and provide it a mock ViewModel. Since the fragment only talks to the ViewModel, mocking it will be sufficient to fully test this UI. 
+    * ViewModel: The ViewModel can be tested using a JUnit test. You need to mock only the UserRepository to test it. 
+    * UserRepository: You can test the UserRepository with a JUnit test as well. You need to mock the Webserviceand the DAO. You can test that it makes the right web service calls, saves the result into the database and does not make any unnecessary requests if the data is cached and up to date. Since both Webservice and UserDao are interfaces, you can mock them or create fake implementations for more complex test cases.. 
+    * UserDao: The recommended approach for testing DAO classes is using instrumentation tests. Since these instrumentation tests do not require any UI, they will still run fast. For each test, you can create an in-memory database to ensure that the test does not have any side effects (like changing the database files on the disk). Room also allows specifying the database implementation so you can test it by providing it the JUnit implementation of the SupportSQLiteOpenHelper. This approach is usually not recommended because the SQLite version running on the device may differ from the SQLite version on your host machine. 
+    * Webservice: It is important to make tests independent from the outside world so even your Webservice tests should avoid making network calls to your backend. There are plenty of libraries that help with this. For instance,MockWebServer is a great library that can help you create a fake local server for your tests. 
+    * Testing Artifacts Architecture Components provides a maven artifact to control its background threads. Inside theandroid.arch.core:core-testing artifact, there are 2 JUnit rules:
+        * InstantTaskExecutorRule: This rule can be used to force Architecture Components to instantly execute any background operation on the calling thread.
+        * CountingTaskExecutorRule: This rule can be used in instrumentation tests to wait for background operations of the Architecture Components or connect it to Espresso as an idling resource.
+￼
+https://developer.android.com/topic/libraries/architecture/images/final-architecture.png
